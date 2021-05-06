@@ -1,9 +1,16 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {DependenciesProvider} from '@akeneo-pim-community/legacy-bridge';
-import {Channel, Category, CategoryTree, CategoryTreeModel, CategoryValue} from '@akeneo-pim-community/shared';
+import {
+  Channel,
+  Category,
+  CategoryTree,
+  CategoryTreeModel,
+  CategoryValue,
+  useIsMounted, useRoute
+} from '@akeneo-pim-community/shared';
 import styled, {ThemeProvider} from 'styled-components';
-import {pimTheme} from 'akeneo-design-system';
+import {pimTheme, TabBar} from 'akeneo-design-system';
 import {Tree} from 'akeneo-design-system/lib';
 import {CategoryResponse, parseResponse} from '../../../CategoryTreeFetcher';
 const UserContext = require('pim/user-context');
@@ -18,13 +25,13 @@ const CategoryTreeContainer = styled.div`
 `;
 
 type CategorySelectorWithAllProductsProps = {
-  channelCode: string;
+  categoryTreeCode: string,
   onChange: (value: string[]) => void;
   initialCategoryCodes: string[];
 };
 
 const CategorySelectorWithAllProducts: React.FC<CategorySelectorWithAllProductsProps> = ({
-  channelCode,
+  categoryTreeCode,
   onChange,
   initialCategoryCodes,
 }) => {
@@ -71,8 +78,7 @@ const CategorySelectorWithAllProducts: React.FC<CategorySelectorWithAllProductsP
 
   const init = async () => {
     await FetcherRegistry.initialize();
-    const channel: Channel = await FetcherRegistry.getFetcher('channel').fetch(channelCode);
-    const category: Category = await FetcherRegistry.getFetcher('category').fetch(channel.category_tree);
+    const category: Category = await FetcherRegistry.getFetcher('category').fetch(categoryTreeCode);
     const response = await fetch(getChildrenUrl(category.id));
     const json: CategoryResponse[] = await response.json();
 
@@ -122,13 +128,56 @@ type SelectorConfig = {
   };
 };
 
+const MultiCategoryTreeSelector = ({categoriesSelected, onCategorySelected}: {categoriesSelected: string[], onCategorySelected: (categoriesSelected: string[]) => void}) => {
+  const [activeCategoryTree, setActiveCategoryTree] = useState<string>('');
+  const [categoryTrees, setCategoryTrees] = useState<{code: string, labels: {fr_FR: string}}[]>([]);
+  const isMounted = useIsMounted();
+  const route = useRoute('pim_enrich_category_rest_list');
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(route);
+      const json = await response.json();
+      if (isMounted()) {
+        setCategoryTrees(json);
+        setActiveCategoryTree(json[0].code);
+      }
+    })()
+  }, [route, setCategoryTrees, isMounted]);
+
+  return (
+    <>
+      <TabBar>
+        {categoryTrees.map((categoryTree) => {
+          return (
+            <TabBar.Tab isActive={activeCategoryTree === categoryTree.code} onClick={() => {
+              setActiveCategoryTree('');
+              setTimeout(() => {
+                setActiveCategoryTree(categoryTree.code);
+              }, 0)
+            }}>
+              {categoryTree.labels.fr_FR}
+            </TabBar.Tab>
+          )
+        })}
+      </TabBar>
+      <div>
+        {activeCategoryTree && (
+          <CategorySelectorWithAllProducts
+            categoryTreeCode={activeCategoryTree}
+            initialCategoryCodes={categoriesSelected}
+            onChange={onCategorySelected}
+          />
+        )}
+      </div>
+    </>
+  );
+}
 class Selector extends BaseView {
-  private channelCode: string;
   private categoryCodes: string[];
 
   constructor(options: SelectorConfig) {
     super(options);
-    this.channelCode = options.attributes.channel;
     this.categoryCodes = options.attributes.categories || [];
   }
 
@@ -140,11 +189,7 @@ class Selector extends BaseView {
     ReactDOM.render(
       <DependenciesProvider>
         <ThemeProvider theme={pimTheme}>
-          <CategorySelectorWithAllProducts
-            channelCode={this.channelCode}
-            initialCategoryCodes={this.categoryCodes}
-            onChange={handleChange}
-          />
+          <MultiCategoryTreeSelector categoriesSelected={this.categoryCodes} onCategorySelected={handleChange} />
         </ThemeProvider>
       </DependenciesProvider>,
       this.$el[0]
