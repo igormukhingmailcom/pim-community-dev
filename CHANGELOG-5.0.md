@@ -1,5 +1,11 @@
 # 5.0.x
 
+## Improvements
+
+- API: `parent` filter can now be used for filtering both products and product models, and accepts the `IN`, `EMPTY` and `NOT EMPTY` operators 
+
+## Bug fixes
+
 - OB-806: Add missing migration on `pim_catalog_completeness` table
 
 # 5.0.24 (2021-05-07)
