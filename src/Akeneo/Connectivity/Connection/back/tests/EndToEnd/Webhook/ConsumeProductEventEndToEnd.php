@@ -16,6 +16,7 @@ use Akeneo\Platform\Component\EventQueue\BulkEvent;
 use Akeneo\Test\Integration\Configuration;
 use Akeneo\Tool\Bundle\ApiBundle\tests\integration\ApiTestCase;
 use AkeneoTest\Pim\Enrichment\Integration\Normalizer\NormalizedProductCleaner;
+use Doctrine\DBAL\Connection as DbalConnection;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -31,6 +32,7 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
 {
     private ProductInterface $referenceProduct;
     private Author $referenceAuthor;
+    private DbalConnection $dbalConnection;
 
     protected function setUp(): void
     {
@@ -38,6 +40,7 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
 
         $this->referenceProduct = $this->loadReferenceProduct();
         $this->referenceAuthor = Author::fromNameAndType('julia', Author::TYPE_UI);
+        $this->dbalConnection = self::$container->get('database_connection');
         $connection = $this->loadConnection();
 
         $this->get('akeneo_connectivity.connection.fixtures.webhook_loader')->initWebhook($connection->code());
@@ -74,6 +77,7 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
         $requestContent = json_decode($request->getBody()->getContents(), true)['events'][0];
         $requestContent = $this->cleanRequestContent($requestContent);
 
+        Assert::assertEquals(1, (int) $this->getEventCount('ecommerce'));
         $this->assertEquals($this->expectedProductCreatedPayload(), $requestContent);
     }
 
@@ -108,6 +112,7 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
         $requestContent = json_decode($request->getBody()->getContents(), true)['events'][0];
         $requestContent = $this->cleanRequestContent($requestContent);
 
+        Assert::assertEquals(1, (int) $this->getEventCount('ecommerce'));
         $this->assertEquals($this->expectedProductUpdatedPayload(), $requestContent);
     }
 
@@ -183,7 +188,7 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
                 'ecommerce',
                 'Ecommerce',
                 FlowType::DATA_DESTINATION,
-                false
+                true
             );
         $this->get('akeneo_connectivity.connection.fixtures.connection_loader')->update(
             $connection->code(),
@@ -299,6 +304,20 @@ class ConsumeProductEventEndToEnd extends ApiTestCase
                 'quantified_associations' => [],
             ],
         ];
+    }
+
+    private function getEventCount(string $connectionCode)
+    {
+        $sql = <<<SQL
+SELECT event_count
+FROM akeneo_connectivity_connection_audit_product
+WHERE connection_code = :connection_code
+AND event_type = 'product_read'
+SQL;
+
+        return $this->dbalConnection->fetchColumn($sql, [
+            'connection_code' => $connectionCode,
+        ]);
     }
 
     protected function getConfiguration(): Configuration

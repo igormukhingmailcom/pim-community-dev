@@ -8,12 +8,15 @@ use Akeneo\Connectivity\Connection\Application\Webhook\Log\EventSubscriptionSend
 use Akeneo\Connectivity\Connection\Application\Webhook\Service\EventsApiRequestLogger;
 use Akeneo\Connectivity\Connection\Application\Webhook\Service\Logger\SendApiEventRequestLogger;
 use Akeneo\Connectivity\Connection\Domain\Webhook\Client\WebhookClient;
+use Akeneo\Connectivity\Connection\Domain\Webhook\Model\WebhookEvent;
 use Akeneo\Connectivity\Connection\Infrastructure\Webhook\RequestHeaders;
+use Akeneo\Platform\Component\EventQueue\EventInterface;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Pool;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Serializer\Encoder\EncoderInterface;
 
 /**
@@ -27,6 +30,7 @@ class GuzzleWebhookClient implements WebhookClient
     private EncoderInterface $encoder;
     private SendApiEventRequestLogger $sendApiEventRequestLogger;
     private EventsApiRequestLogger $debugLogger;
+    private EventDispatcherInterface $eventDispatcher;
 
     /** @var array{concurrency: ?int, timeout: ?float} */
     private $config;
@@ -39,6 +43,7 @@ class GuzzleWebhookClient implements WebhookClient
         EncoderInterface $encoder,
         SendApiEventRequestLogger $sendApiEventRequestLogger,
         EventsApiRequestLogger $debugLogger,
+        EventDispatcherInterface $eventDispatcher,
         array $config
     ) {
         $this->client = $client;
@@ -46,6 +51,7 @@ class GuzzleWebhookClient implements WebhookClient
         $this->sendApiEventRequestLogger = $sendApiEventRequestLogger;
         $this->debugLogger = $debugLogger;
         $this->config = $config;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function bulkSend(iterable $webhookRequests): void
@@ -88,6 +94,12 @@ class GuzzleWebhookClient implements WebhookClient
                     $webhookRequestLog->setEndTime(microtime(true));
                     $webhookRequestLog->setResponse($response);
 
+                    $productIds = array_map(
+                        fn (WebhookEvent $webhookEvent) => $webhookEvent->getPimEvent()->getData()['id'],
+                        $webhookRequestLog->getWebhookRequest()->apiEvents()
+                    );
+
+                    //$this->eventDispatcher->dispatch($event);
                     $this->debugLogger->logEventsApiRequestSucceed(
                         $webhookRequestLog->getWebhookRequest()->webhook()->connectionCode(),
                         $webhookRequestLog->getWebhookRequest()->apiEvents(),
