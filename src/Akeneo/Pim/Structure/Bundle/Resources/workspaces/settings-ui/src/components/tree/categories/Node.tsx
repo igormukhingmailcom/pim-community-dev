@@ -1,11 +1,10 @@
 import React, {FC, useCallback} from 'react';
 import {Tree} from '../../shared';
 import {CategoryTreeModel as CategoryTreeModel} from '../../../models';
-import {useCategoryTreeNode} from '../../../hooks';
+import {useCategoryTreeNode, useCountProductsBeforeDeleteCategory} from '../../../hooks';
 import {MoveTarget} from '../../providers';
 import {Button} from 'akeneo-design-system';
 import {useTranslate} from '@akeneo-pim-community/shared';
-import {useCountProductsBeforeDeleteCategory} from '../../../hooks';
 import {NodePreview} from './NodePreview';
 
 type Props = {
@@ -24,7 +23,6 @@ const Node: FC<Props> = ({id, label, followCategory, addCategory, deleteCategory
     node,
     children,
     loadChildren,
-    forceReloadChildren,
     moveTo,
     draggedCategory,
     setDraggedCategory,
@@ -35,6 +33,10 @@ const Node: FC<Props> = ({id, label, followCategory, addCategory, deleteCategory
     setMoveTarget,
     resetMove,
     onDeleteCategory,
+    onCreateCategory,
+    isOpen,
+    open,
+    close,
   } = useCategoryTreeNode(id);
 
   const translate = useTranslate();
@@ -81,6 +83,9 @@ const Node: FC<Props> = ({id, label, followCategory, addCategory, deleteCategory
         draggedCategory !== null &&
         draggedCategory.identifier !== node.identifier
       }
+      isOpen={node.type === 'root' ? true : isOpen}
+      open={open}
+      close={close}
       onOpen={async () => {
         // @todo handle when children have already loaded
         if (node.childrenStatus !== 'idle') {
@@ -166,7 +171,7 @@ const Node: FC<Props> = ({id, label, followCategory, addCategory, deleteCategory
               size="small"
               onClick={event => {
                 event.stopPropagation();
-                addCategory(node.data.code, forceReloadChildren);
+                addCategory(node.data.code, onCreateCategory);
               }}
             >
               {translate('pim_enrich.entity.category.new_category')}

@@ -9,12 +9,12 @@ import React, {
   useState,
 } from 'react';
 import styled, {css} from 'styled-components';
-import {AkeneoThemedProps, getColor, RowIcon, useBooleanState} from 'akeneo-design-system';
+import {AkeneoThemedProps, getColor, RowIcon} from 'akeneo-design-system';
 import {TreeNode} from '../../../models';
 import {ArrowButton, DragInitiator, RowActionsContainer, RowInnerContainer, TreeArrowIcon, TreeRow} from './TreeRow';
 import {TreeActions} from './TreeActions';
-import Timeout = NodeJS.Timeout;
 import {TreeIcon} from './TreeIcon';
+import Timeout = NodeJS.Timeout;
 
 const TreeContainer = styled.li<{isRoot: boolean} & AkeneoThemedProps>`
   display: block;
@@ -44,6 +44,9 @@ type TreeProps<T> = {
   selected?: boolean;
   isLoading?: boolean;
   readOnly?: boolean;
+  isOpen?: boolean;
+  open?: () => void;
+  close?: () => void;
   onOpen?: (value: TreeNode<T>) => void;
   onClose?: (value: TreeNode<T>) => void;
   onChange?: (value: TreeNode<T>, checked: boolean, event: SyntheticEvent) => void;
@@ -71,6 +74,9 @@ const Tree = <T,>({
   selected = false,
   isLoading = false,
   readOnly = false,
+  isOpen = false,
+  open,
+  close,
   onChange,
   onOpen,
   onClose,
@@ -101,22 +107,27 @@ const Tree = <T,>({
 
   const dragRef = useRef<HTMLDivElement>(null);
   const treeRowRef = useRef<HTMLDivElement>(null);
-  const [isOpen, open, close] = useBooleanState(_isRoot);
   const [timer, setTimer] = useState<Timeout | null>(null);
 
   const handleOpen = useCallback(() => {
+    if (open === undefined) {
+      return;
+    }
     open();
     if (onOpen) {
       onOpen(value);
     }
-  }, [onOpen, value]);
+  }, [open, onOpen, value]);
 
   const handleClose = useCallback(() => {
+    if (close === undefined) {
+      return;
+    }
     close();
     if (onClose) {
       onClose(value);
     }
-  }, [onClose, value]);
+  }, [close, onClose, value]);
 
   const handleArrowClick = useCallback(
     event => {
